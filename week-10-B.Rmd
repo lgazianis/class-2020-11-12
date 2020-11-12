@@ -41,10 +41,43 @@ week_10_folds <- vfold_cv(week_10_train, v = 10)
 
 **Prompt:** Create a workflow object called `mod_1_wfl` which uses the `lm` engine to run a linear regression. Use a recipe in which reg_chg is a function of `treatment` and `poverty_n`. (No need for an interaction term today.) 
 
+```{r}
+
+mod_1_wfl <- workflow() %>%
+  add_recipe((recipe(data = week_10_train, 
+                     reg_chg ~ treatment + poverty_n))) %>%
+  add_model(linear_reg() %>% set_engine("lm"))
+
+mod_1_wfl %>% 
+  fit(data = week_10_train) %>%
+  predict(new_data = week_10_train) %>%
+  bind_cols(week_10_train %>% select(reg_chg)) %>%
+  metrics(truth = reg_chg, estimate = `.pred`)
+  
+
+```
+
+
 * Calculate the RMSE for this model on the training data. (We did a similar exercise on Tuesday, so feel free to refer to your prior code.)
 
 * Create a model which produces a lower RMSE on the training data. (Do not use the cross-validated data sets until the next Scene.) You may do anything you like! Our advice is to keep the same basic structure as `mod_1_wfl`, but to change the formula and to experiment with various `step_` functions. Call this workflow `mod_2_wfl`. Hints: `step_poly()` and `step_bs()` are fun to play with.
 
+
+```{r}
+
+mod_2_wfl <- workflow() %>%
+  add_recipe((recipe(data = week_10_train, 
+                     reg_chg ~ treatment + poverty_n + county))) %>%
+  add_model(linear_reg() %>% set_engine("lm")) %>%
+  step_poly(poverty_n, degree = 15) %>%
+  fit(data = week_10_train)
+
+mod_2_wfl %>%
+  predict(new_data = week_10_train) %>%
+  bind_cols(week_10_train %>% select(reg_chg)) %>%
+  metrics(truth = reg_chg, estimate = `.pred`)
+
+```
 
  
 
@@ -54,8 +87,28 @@ week_10_folds <- vfold_cv(week_10_train, v = 10)
 
 * Calculate mean RMSE using `week_10_folds` for both `mod_1_wfl` and `mod_2_wfl`.  Even though I have no idea what model you built, I bet that the cross-validated `mod_1_wfl` RSME will be better (lower) that the one for `mod_2_wfl`.
 
+```{r}
+
+mod_1_wfl %>%
+  fit_resamples(resamples = week_10_folds) %>%
+  collect_metrics()
+
+mod_2_wfl %>%
+  fit_resamples(resamples = week_10_folds) %>%
+  collect_metrics()
+
+```
+
+
 * Write a few sentences explaining why a model which worked so well on week_10_train worked so poorly on week_10_folds.
 
+week_10_train contains a majority of the data set, while week_10_folds does not. 
+This is likely the reason our model worked better on the former. Testing with a 
+second model for the purpose of cross-validation provided us with a check for 
+our first estimates to see if we overfit the model or anything like that. 
+Cross-validation is an important way to verify the accuracy of a model. Our 
+rsq and rsme values, moreover, were likely impacted greatly by outliers in our 
+polynomials. 
 
 
 ## Scene 3
@@ -64,7 +117,19 @@ week_10_folds <- vfold_cv(week_10_train, v = 10)
 
 * Use `predict()` to calculate the expected `reg_chg` in a polling station assigned to the treatment and with `poverty_n` equal to 1.5. 
 
+```{r}
+
+sc3tibble <- tibble(treatment = "control", poverty_n = 1.5)
+
+mod_1_wfl %>%
+  fit(data = week_10_train) %>%
+  predict(new_data = sc3tibble, type = "conf_int", level = .95)
+
+```
+
+
 * Provide the 95% confidence interval for this estimate.
 
 * Write a few sentences interpreting this confidence interval.
 
+We are 95% confident that the true value lies between .0123 and .0301. 
